@@ -1,0 +1,88 @@
+#! /bin/bash
+#Michael Feldt
+# 11/13/17
+
+thishost="$(hostname -s) \t $(date)"
+echo -e $thishost
+
+echo -e "\n\nSystem Information"
+echo -e "-----------------------------------------"
+echo -e "Manufacturer \t\t\t\t :" $(dmidecode -s system-manufacturer)
+echo -e "Product Name \t\t\t\t :" $(dmidecode -s system-product-name)
+echo -e "System Version \t\t\t\t :" $(dmidecode -s system-version)
+echo -e "System Serial Number \t\t\t :" $(dmidecode -s system-serial-number)
+echo -e "System Type \t\t\t\t :" $(lshw | grep -i chassis | awk '{print $3}' | awk -F= '{print $2}')
+echo -e "\n\nBoot Information"
+echo -e "-----------------------------------------"
+if [ -e /boot/efi ]
+then
+{
+    echo -e "UEFI boot partition: \t\t\t :" $(df | grep /boot/efi | '{print $1}')
+    echo -e "Root partition \t\t\t\t :" $(findmnt / | grep dev | awk '{print $2}')
+}
+fi
+
+echo -e "\n\nMotherboard Information"
+echo -e "================================"
+echo -e "Manufacturer \t\t\t\t :" $(dmidecode -s baseboard-manufacturer)
+echo -e "Product Name \t\t\t\t :" $(dmidecode -s baseboard-product-name)
+echo -e "Version \t\t\t\t :" $(dmidecode -s baseboard-version)
+echo -e "Serial Number \t\t\t\t :" $(dmidecode -s baseboard-serial-number)
+
+echo -e "\n\nBIOS information"
+echo -e "================================="
+echo -e "BIOS Vender \t\t\t\t :" $(dmidecode -s bios-vendor)
+echo -e "BIOS version \t\t\t\t :" $(dmidecode -s bios-verison)
+echo -e "BIOS Release date \t\t\t\t :" $(dmidecode -s bios-release-date)
+echo -e "BIOS Revision \t\t\t\t :" $(dmidecode -t bios | grep Revision | awk -F: '{print $2}')
+
+echo -e "\n\nOperating System Information"
+echo -e "===================================="
+echo -e "\nODistribution Name \t\t\t :" $(lsb_release -d|awk -F: '{print $2}' |sed -e 's/^[ \t]*//g')
+
+echo -e "Kernal Version \t\t\t\t :" $(uname -r)
+echo -e "OS Architecture\t\t\t\t :" $(uname -m)
+
+echo -e "OS Language \t\t\t\t :" $(locale -ck LC_IDENTIFICATION | grep language | \ awk -F\" '{print $2}')
+
+echo -e "System Uptime \t\t\t:" $(uptime | awk -F, '{print $1","$2" hours"}' | awk -F"up" '{print "up "$2}')
+
+echo -e "Current Timezone \t\t\t :" $(timedatectl | grep "Time zone" | awk -F": " '{print $2}')
+
+echo -e "\n\nDisk Storage Info"
+echo -e "======================"
+echo -e "Physical Disk found: "TDISK=$(\sbin\fdisk -l |grep Disk|grep bytes|egrep -v "loop|mapper|md")
+echo -e "$TDISK" |awk '{print $2 "\t\t" $3 " " $4}' | sed -e 's/[:|,]//g'
+
+echo -e "\n\nPhysical Memory Info"
+echo -e "--------------------------"
+dmidecode --type memory > /tmp/mem.out
+sed -n -e '/Memory Device/,$ p' /tmp/mem.out > /tmp/memd.out
+echo -e "Total RAM \t\t\t\t: " $(grep MemTotal /proc/meminfo | \ awk ' {print $2/1024/1024}' | awk -F. ' {print $1+1 " GB"}')
+
+echo -e "Error Detecting Method \t\t\t: "$(grep -w "Error Detecting Mathod" \ /tmp/mem.out | awk -F: '{print $2}')
+
+echo -e "Error Correcting Capabilities \t\t: "$( \ grep -w -m1 "Error Correcting Capabilities" /tmp/mem.out | \ awk -F: '{print $2}')
+
+echo -e "No. Of Memory Module(s) Found \t\t: "$(grep -w "Installed Size" \ /tmp/mem.out | grep -vc "Not Installed")
+
+echo -e "\nHardware Specification of Each Memeory Module"
+echo -e "=================================="
+grep -E '[[:blank:]]Size: [0-9]+' /tmp/memd.out -All | grep -Ev 'Set|Tag' | \ sed -e 's/^\s*//'|awk -F: 'print $1}' > /tmp/m1.out
+grep -E '[[:blank:]]Size: [0-9]+' /tmp/memd.out -All | grep -Ev 'Set|Tag' | \ awk -F: '{print $2}'|sed -e 's/^\s*//' > /tmp/m2.out
+
+pr -t -m -w 50 -S:\ /tmp/m1.out /tmp/m2.out
+rm -rf /tmp/{mem.out,memd.out,m1.out,m2.out}
+
+echo -e "\n\nSoftware Inventory: Installed Packages"
+echo -e "-----------------------------------------"
+echo -e "\n\nNumber of Installed Software Packages: " $(dpkg -l | \ grep -c "ii")
+echo -e "\n\nName \t\t\t\t\t\t Version Number \t\t\t\t Architecture: "
+dpkg-query -l | grep ii | awk '{print $2 " " $3 " " $4}' | sort | column -c 65 -t
+
+
+
+
+
+
+
